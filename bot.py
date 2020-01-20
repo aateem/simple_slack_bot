@@ -1,19 +1,22 @@
 import logging
 import os
 
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from slack import WebClient
 
-from process_text import get_app_message, get_channels, get_phrases, HELP_MESSAGE
+from process_text import get_app_message, split_message, HELP_MESSAGE, ACK_MESSAGE
 
 logging.basicConfig(level=os.environ.get("APP_LOGGING_LEVEL", logging.INFO))
 
 app = Flask(__name__)
 
-# CMD_REGEX = (
-#     '.*listen\s*for\s*phrases\:\s*(\["?[a-zA-Z0-9].*"?\|*\])*\s?'
-#     "in\s?channels\:\s*([a-zA-Z0-9].*\,*)"
-# )
+USER_CONFIG = {}
+
+
+# debug
+@app.route("/config")
+def get_config():
+    return jsonify(USER_CONFIG)
 
 
 @app.route("/ping")
@@ -76,28 +79,34 @@ def process_app_message(event):
     message = get_app_message(event.get("text", ""))
 
     if message.strip().startswith("help"):
-        give_help(event.get("channel"))
+        chat_post_message(event.get("channel"), HELP_MESSAGE)
         return
 
-    phrases = get_phrases(message)
-    channels = get_channels(message)
+    phrases, channels = split_message(message)
 
     if phrases and channels:
-        user = event.get("user", "")
-        update_user_config(user, phrases, channels)
+        update_user_config(event, phrases, channels)
     else:
-        give_help(event.get("channel"))
+        chat_post_message(event.get("channel"), HELP_MESSAGE)
 
 
-def give_help(channel):
+def update_user_config(event, phrases, channels):
+    user = event.get("user")
+    if not user:
+        logging.error("User is not present in the message description, cannot set the config")
+        return
+
+    USER_CONFIG[user] = {"phrases": phrases, "channels": channels}
+
+    msg = ACK_MESSAGE.format("\n".join(phrase for phrase in phrases), " ".join(channels))
+    chat_post_message(event.get("channel"), msg)
+
+
+def chat_post_message(channel, message):
     web_client = WebClient(token=os.environ["SLACK_API_TOKEN"])
-    response = web_client.chat_postMessage(channel=channel, text=HELP_MESSAGE)
+    response = web_client.chat_postMessage(channel=channel, text=message)
     if not response.get("ok", True):
         logging.error(
-            "Send help message operation unsuccessful."
-            "Returned error msg: {}".format(response["error"])
+            "Send message operation for channel {} unsuccessful."
+            "Returned error msg: {}".format(channel, response["error"])
         )
-
-
-def update_user_config(user, phrases, channels):
-    pass

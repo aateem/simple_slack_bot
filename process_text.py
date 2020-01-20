@@ -2,9 +2,9 @@ import re
 
 
 MENTION_REGEXP = "^<@(|[WU].+?)>(.*)"
-PHRASE_LIST_REGEXP = '.*listen\s*for\s*phrases\:\s*(\["?[a-zA-Z0-9].*"?\|*\])*\s?'
-CHANNEL_LIST_REGEXP = ".*in\s?channels\:\s*([a-zA-Z0-9].*\,*)"
 
+QUOTE_PREFIX = "&gt; "
+CHANNEL_ID_PREFIX = "<#C"
 
 HELP_MESSAGE = """
 Whislteblower bot notifies you in DM whenever
@@ -19,6 +19,12 @@ The bot will be sending notifications until explicitly disabled via:
 > *@whislteblowerbot* cease!
 """
 
+ACK_MESSAGE = """
+Updated your configuration.
+
+You are listening for phrases\n{}
+in channels [{}]"""
+
 
 def get_app_message(text):
     substrings = re.split(MENTION_REGEXP, text)
@@ -29,22 +35,18 @@ def get_app_message(text):
     return substrings[0]
 
 
-def _separate_strings(matched_group):
-    for s in matched_group.strip().strip("]").strip("[").split("|"):
-        yield s
+def split_message(text):
+    if "listen for phrases" in text.lower() and "in channels" in text.lower():
+        phrases_substr, channels_substr = text.split("in channels")
+        return _get_phrases(phrases_substr), _get_channels(channels_substr)
+    return None, None
 
 
-def get_phrases(message):
-    phrases = None
-    match = re.match(PHRASE_LIST_REGEXP, message)
-    if match:
-        phrases = [phrase.strip().strip('"') for phrase in _separate_strings(match.group(1))]
-    return phrases
+def _get_phrases(phrases_substring):
+    return [phrase for phrase in phrases_substring.split("\n") if phrase.startswith(QUOTE_PREFIX)]
 
 
-def get_channels(message):
-    channels = None
-    match = re.match(CHANNEL_LIST_REGEXP, message)
-    if match:
-        channels = [chan.strip() for chan in _separate_strings(match.group(1))]
-    return channels
+def _get_channels(channels_substring):
+    return [
+        channel for channel in channels_substring.split() if channel.startswith(CHANNEL_ID_PREFIX)
+    ]
