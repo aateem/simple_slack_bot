@@ -127,10 +127,14 @@ def _check_bot_im(event):
 
 
 def process_app_message(event):
-    message = get_app_message(event.get("text", ""))
+    message = get_app_message(event.get("text", "")).strip()
 
-    if message.strip().startswith("help"):
+    if message.startswith("help"):
         chat_post_message(event.get("channel"), HELP_MESSAGE)
+        return
+
+    if message.startswith("purge config"):
+        purge_user_config(event)
         return
 
     phrases, channels = split_message(message)
@@ -139,6 +143,26 @@ def process_app_message(event):
         update_user_config(event, phrases, channels)
     else:
         chat_post_message(event.get("channel"), HELP_MESSAGE)
+
+
+def purge_user_config(event):
+    user_id = event.get("user")
+    if user_id in USER_CONFIG["users"]:
+        del USER_CONFIG["users"][user_id]
+
+    channels_conf = USER_CONFIG.get("channels", {})
+    for chan_id, chan_info in channels_conf.items():
+        phrases_conf = chan_info.get("phrases", {})
+        stale_phrases = []
+        for phrase, users in phrases_conf.items():
+            if user_id in users:
+                users.remove(user_id)
+                if not users:
+                    stale_phrases.append(phrase)
+        for phrase in stale_phrases:
+            del phrases_conf[phrase]
+
+    chat_post_message(channel=event.get("channel"), message="I have purged your configuration!")
 
 
 def update_user_config(event, phrases, channels):
@@ -154,7 +178,8 @@ def update_user_config(event, phrases, channels):
         conf_channel = USER_CONFIG["channels"].setdefault(chan_id, {"long_id": chan, "phrases": {}})
         for phrase in phrases:
             conf_phrase = conf_channel["phrases"].setdefault(phrase.strip(QUOTE_PREFIX), [])
-            conf_phrase.append(user)
+            if user not in conf_phrase:
+                conf_phrase.append(user)
 
     msg = ACK_MESSAGE.format("\n".join(phrase for phrase in phrases), " ".join(channels))
     chat_post_message(event.get("channel"), msg)
