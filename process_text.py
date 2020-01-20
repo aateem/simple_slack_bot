@@ -13,19 +13,20 @@ a set.
 
 Both phrase and channel lists are given by you, just
 say smth like:
->> @whistleblowerbot listen for phrases: ["foo bar" | "foozah" ] in channels: [channel_1 | channel_2 | channel_3]
+> *@whistleblowerbot* listen for phrases: ["foo bar" | "foozah" ] in channels: [channel_1 | channel_2 | channel_3]
 
 The bot will be sending notifications until explicitly disabled via:
->> @whislteblowerbot cease!
+> *@whislteblowerbot* cease!
 """
 
 
-def get_bot_mention_message(text):
-    message = ""
-    match = re.match(MENTION_REGEXP, text)
-    if match:
-        message = match.group(2).strip()
-    return message
+def get_app_message(text):
+    substrings = re.split(MENTION_REGEXP, text)
+
+    if len(substrings) > 1:
+        return substrings[2]
+
+    return substrings[0]
 
 
 def _separate_strings(matched_group):
