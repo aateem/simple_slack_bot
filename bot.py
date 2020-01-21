@@ -1,7 +1,9 @@
+import json
 import logging
 import os
 
 from flask import Flask, request, jsonify
+import redis
 from slack import WebClient
 
 from process_text import get_app_message, split_message, HELP_MESSAGE, ACK_MESSAGE, QUOTE_PREFIX
@@ -10,13 +12,21 @@ logging.basicConfig(level=os.environ.get("APP_LOGGING_LEVEL", logging.INFO))
 
 app = Flask(__name__)
 
-USER_CONFIG = {"users": {}, "channels": {}}
 
-
-# debug
 @app.route("/config")
 def get_config():
-    return jsonify(USER_CONFIG)
+    r_client = redis.Redis(
+        host=os.environ["REDIS_HOST"],
+        port=os.environ["REDIS_PORT"],
+        db=os.environ["REDIS_CONFIG_DB"],
+    )
+    users = {}
+    channels = {}
+    for user_id in r_client.scan_iter(match="U*"):
+        users[str(user_id)] = json.loads(r_client.get(user_id))
+    for chan_id in r_client.scan_iter(match="C*"):
+        channels[str(chan_id)] = json.loads(r_client.get(chan_id))
+    return jsonify({"users": users, "channels": channels})
 
 
 @app.route("/ping")
@@ -51,16 +61,21 @@ def chat_message(event):
 
 def process_chat_message(event):
     channel = event.get("channel")
-    if channel in USER_CONFIG["channels"]:
-        channel_conf = USER_CONFIG["channels"][channel]
-        phrases_conf = channel_conf.get("phrases", {})
 
-        for phrase in phrases_conf.keys():
+    r_client = redis.Redis(
+        host=os.environ["REDIS_HOST"],
+        port=os.environ["REDIS_PORT"],
+        db=os.environ["REDIS_CONFIG_DB"],
+    )
+
+    if r_client.exists(channel):
+        chan_conf = json.loads(r_client.get(channel))
+        phrases_users = chan_conf.get("phrases", {})
+
+        for phrase, users in phrases_users.items():
             if phrase in event.get("text", ""):
                 _notify_users(
-                    user_ids=phrases_conf[phrase],
-                    channel_long_id=channel_conf["long_id"],
-                    phrase=phrase,
+                    user_ids=users, channel_long_id=chan_conf["long_id"], phrase=phrase,
                 )
 
 
@@ -76,7 +91,14 @@ has appeared in {channel_long_id}
 
 
 def _get_dm_channel_id(user_id):
-    dm_channel_id = USER_CONFIG["users"][user_id].get("dm_channel_id")
+    r_client = redis.Redis(
+        host=os.environ["REDIS_HOST"],
+        port=os.environ["REDIS_PORT"],
+        db=os.environ["REDIS_CONFIG_DB"],
+    )
+
+    user_conf = json.loads(r_client.get(user_id))
+    dm_channel_id = user_conf.get("dm_channel_id")
     if not dm_channel_id:
         web_client = WebClient(token=os.environ["SLACK_API_TOKEN"])
         response = web_client.conversations_open(users=[user_id])
@@ -88,7 +110,8 @@ def _get_dm_channel_id(user_id):
             return
 
         dm_channel_id = response.get("channel", {}).get("id")
-        USER_CONFIG["users"][user_id]["dm_channel_id"] = dm_channel_id
+        user_conf["dm_channel_id"] = dm_channel_id
+        r_client.set(user_id, json.dumps(user_conf))
 
     return dm_channel_id
 
@@ -147,20 +170,30 @@ def process_app_message(event):
 
 def purge_user_config(event):
     user_id = event.get("user")
-    if user_id in USER_CONFIG["users"]:
-        del USER_CONFIG["users"][user_id]
 
-    channels_conf = USER_CONFIG.get("channels", {})
-    for chan_id, chan_info in channels_conf.items():
-        phrases_conf = chan_info.get("phrases", {})
+    r_client = redis.Redis(
+        host=os.environ["REDIS_HOST"],
+        port=os.environ["REDIS_PORT"],
+        db=os.environ["REDIS_CONFIG_DB"],
+    )
+
+    if r_client.exists(user_id):
+        r_client.delete(user_id)
+
+    for chan_id in r_client.scan_iter(match="C*"):
+        chan_conf = json.loads(r_client.get(chan_id))
+        phrases_users = chan_conf.get("phrases", {})
+
         stale_phrases = []
-        for phrase, users in phrases_conf.items():
+        for phrase, users in phrases_users.items():
             if user_id in users:
                 users.remove(user_id)
                 if not users:
                     stale_phrases.append(phrase)
         for phrase in stale_phrases:
-            del phrases_conf[phrase]
+            del phrases_users[phrase]
+
+        r_client.set(chan_id, json.dumps(chan_conf))
 
     chat_post_message(channel=event.get("channel"), message="I have purged your configuration!")
 
@@ -171,15 +204,27 @@ def update_user_config(event, phrases, channels):
         logging.error("User is not present in the message description, cannot set the config")
         return
 
-    USER_CONFIG["users"][user] = {"phrases": phrases, "channels": channels}
+    r_client = redis.Redis(
+        host=os.environ["REDIS_HOST"],
+        port=os.environ["REDIS_PORT"],
+        db=os.environ["REDIS_CONFIG_DB"],
+    )
+
+    user_conf = {"phrases": phrases, "channels": channels}
+    r_client.set(user, json.dumps(user_conf))
 
     for chan in channels:
         chan_id = chan.split("|")[0].strip("<").strip("#")
-        conf_channel = USER_CONFIG["channels"].setdefault(chan_id, {"long_id": chan, "phrases": {}})
-        for phrase in phrases:
-            conf_phrase = conf_channel["phrases"].setdefault(phrase.strip(QUOTE_PREFIX), [])
-            if user not in conf_phrase:
-                conf_phrase.append(user)
+
+        if not r_client.exists(chan_id):
+            chan_conf = {"long_id": chan, "phrases": {phrase: [user] for phrase in phrases}}
+        else:
+            chan_conf = json.loads(r_client.get(chan_id))
+            for phrase in phrases:
+                phrase_users = chan_conf["phrases"].setdefault(phrase.strip(QUOTE_PREFIX), [])
+                if user not in phrase_users:
+                    phrase_users.append(user)
+        r_client.set(chan_id, json.dumps(chan_conf))
 
     msg = ACK_MESSAGE.format("\n".join(phrase for phrase in phrases), " ".join(channels))
     chat_post_message(event.get("channel"), msg)
