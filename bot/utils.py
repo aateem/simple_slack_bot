@@ -1,3 +1,9 @@
+import os
+
+from redis import Redis
+from slack import WebClient
+
+
 QUOTE_PREFIX = "&gt; "
 CHANNEL_ID_PREFIX = "<#C"
 
@@ -19,6 +25,17 @@ Updated your configuration.
 
 You are listening for phrases\n{}
 in channels [{}]"""
+
+NOTIFY_USER_MSG = """
+Phrase:\n
+{}{}\n
+has appeared in {}
+"""
+
+redis_client = Redis(
+    host=os.environ["REDIS_HOST"], port=os.environ["REDIS_PORT"], db=os.environ["REDIS_CONFIG_DB"],
+)
+web_api_client = WebClient(token=os.environ["SLACK_API_TOKEN"])
 
 
 def split_message(text):
