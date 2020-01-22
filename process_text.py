@@ -1,8 +1,3 @@
-import re
-
-
-MENTION_REGEXP = "^<@(|[WU].+?)>(.*)"
-
 QUOTE_PREFIX = "&gt; "
 CHANNEL_ID_PREFIX = "<#C"
 
@@ -24,15 +19,6 @@ Updated your configuration.
 
 You are listening for phrases\n{}
 in channels [{}]"""
-
-
-def get_app_message(text):
-    substrings = re.split(MENTION_REGEXP, text)
-
-    if len(substrings) > 1:
-        return substrings[2]
-
-    return substrings[0]
 
 
 def split_message(text):
