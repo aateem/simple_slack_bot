@@ -32,9 +32,15 @@ Phrase:\n
 has appeared in {}
 """
 
-redis_client = Redis(
-    host=os.environ["REDIS_HOST"], port=os.environ["REDIS_PORT"], db=os.environ["REDIS_CONFIG_DB"],
-)
+# TODO: move this to separate module, e.g. config
+# redis client configuration defaults
+REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
+REDIS_PORT = os.environ.get("REDIS_PORT", "6379")
+REDIS_CONFIG_DB = os.environ.get("REDIS_CONFIG_DB", "1")
+REDIS_QUEUE_DB = os.environ.get("REDIS_CONFIG_QUEUE", "0")
+
+redis_client = Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_CONFIG_DB)
+
 web_api_client = WebClient(token=os.environ["SLACK_API_TOKEN"])
 
 

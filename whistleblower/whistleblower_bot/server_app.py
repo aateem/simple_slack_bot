@@ -37,5 +37,6 @@ def event_listener():
     if data.get("type") == "url_verification":
         return data.get("challenge", "")
 
-    process_slack_event(data)
+    process_slack_event.delay(data)
+    # process_slack_event(data)
     return ("", 200)
