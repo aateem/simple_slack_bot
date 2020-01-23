@@ -20,9 +20,7 @@ The bot will be sending notifications until explicitly disabled via:
 > *@whislteblowerbot* cease!
 """
 
-ACK_MESSAGE = """
-Updated your configuration.
-
+DISPLAY_CONF_MESSAGE = """
 You are listening for phrases\n{}
 in channels [{}]"""
 

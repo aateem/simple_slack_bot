@@ -17,9 +17,9 @@ def get_config():
     users = {}
     channels = {}
     for user_id in redis_client.scan_iter(match="U*"):
-        users[str(user_id)] = json.loads(redis_client.get(user_id))
+        users[user_id.decode("utf-8")] = json.loads(redis_client.get(user_id))
     for chan_id in redis_client.scan_iter(match="C*"):
-        channels[str(chan_id)] = json.loads(redis_client.get(chan_id))
+        channels[chan_id.decode("utf-8")] = json.loads(redis_client.get(chan_id))
     return jsonify({"users": users, "channels": channels})
 
 
@@ -38,5 +38,4 @@ def event_listener():
         return data.get("challenge", "")
 
     process_slack_event.delay(data)
-    # process_slack_event(data)
     return ("", 200)
