@@ -8,16 +8,33 @@ QUOTE_PREFIX = "&gt; "
 CHANNEL_ID_PREFIX = "<#C"
 
 HELP_MESSAGE = """
-Whislteblower bot notifies you in DM whenever
-any of defined phrases pops up in any channel from
-a set.
+Give phrases and channels and I will notify you in DM when a phrase appears in a channel.
 
-Both phrase and channel lists are given by you, just
-say smth like:
-> *@whistleblowerbot* listen for phrases: ["foo bar" | "foozah" ] in channels: [channel_1 | channel_2 | channel_3]
+*!!! MAKE SURE !!!* I am added to every channel in that list, otherwise I cannot notify you.
 
-The bot will be sending notifications until explicitly disabled via:
-> *@whislteblowerbot* cease!
+If you want to set the configuraton for yourself send me a message of following example:
+
+_*@whistleblowerbot* listen for phrases:_
+> _foo bar_
+> _foozah_
+> _who's here?!_
+_in channels: *#channel_1 #channel_2 #channel_3*_
+
+Each line in the multiline quote block will represent a particular phrase that I will listen for.
+
+Don't worry I will keep the configuration for as long as I live!
+
+If you want to listen to smth else just repeat the message with new phrases and channels.
+
+To unsubscribe send me:
+
+_*@whistleblowerbot* purge config_
+
+To retrieve your configuration:
+
+_*@whistleblowerbot* get config_
+
+Have fun with you chatting, but remember ... I am listening ;)
 """
 
 DISPLAY_CONF_MESSAGE = """
