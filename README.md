@@ -1,9 +1,9 @@
-##Overview
+## Overview
 
 This repository defines an [Slack Application](https://api.slack.com/start/overview), called the `Whistleblower Bot` that monitors all messages in certain list of channels for having a particular phrase embed in them.
 Both the channels and phrases are set by users while interacting with a bot provided by the application.
 
-##Slack application installation
+## Slack application installation
 
 If you need to create a separate Slack application that will have this module as the backend, then you should follow the guide to the apps linked above.
 
@@ -24,7 +24,7 @@ Now add *@whistleblower_bot* to any number of public channels.
 
 **NOTE:** when you register request URL for Event API the backend application must be up and running, so that it could respond to the challenge request.
 
-##Deploy application
+## Deploy application
 
 **NOTE:** before starting the services `SLACK_API_TOKEN` environment variable must be set to the value of OAuth Access Token given to you when adding the bot user to the workspace.
 
@@ -34,9 +34,9 @@ Deploy the app by running `docker-compose up` from its root directory.
 
 **HINT:** if you are developing locally, you can use [ngrok](https://ngrok.com/) or service with similar functionality to get a tunnel for your app.
 
-##Development
+## Development
 
-###Architecture overview
+### Architecture overview
 
 Conceptually the application consists of four components:
 * HTTP web server - handling incoming requests from Slack Event API;
@@ -51,13 +51,13 @@ Since multiple workers may be retrieving or updating a singular piece of informa
 
 In current version `docker-compose` fires up three containers: server app, redis and celery worker node.
 
-###Dev setup
+### Dev setup
 
 Unfortunately right now the default deployment option, via `docker-compose`, is not very dev friendly, i.e. one has to rebuild the containers every time the code changes, both server and celery workers are deployed w/o logging enabling.
 
 If you want to develop quickly and debug issue in more easy way, I suggest you fire up the server and async worker backend locally, maybe even with disabled concurrency.
 
-##Further plans
+## Further plans
 
 * add test coverage
 * provide dev setup
